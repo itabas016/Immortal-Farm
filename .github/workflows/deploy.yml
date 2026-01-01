@@ -1,0 +1,48 @@
+
+name: Deploy to Oracle Cloud
+
+on:
+  push:
+    branches:
+      - main  # 只有当代码合并进 main 分支时触发
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build project
+        run: npm run build
+        env:
+          API_KEY: ${{ secrets.API_KEY }} # 构建时注入 API Key
+
+      - name: Deploy to Server via SSH
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "dist/*" # 假设你的构建输出目录是 dist
+          target: "/var/www/immortal-farm"
+          strip_components: 1 # 去掉 dist 文件夹层级，直接放内容
+
+      - name: Post-deployment cleanup
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            sudo systemctl restart nginx
+
